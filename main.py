@@ -1,15 +1,24 @@
-import sys
 import sqlite3
-from PyQt6.QtWidgets import QApplication, QLabel, QWidget, QGridLayout, \
+import sys
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QApplication, QLabel, QGridLayout, \
     QLineEdit, QPushButton, QMainWindow, QTableWidget, QTableWidgetItem, \
     QDialog, QVBoxLayout, QComboBox, QToolBar, QStatusBar, QMessageBox
-from PyQt6.QtGui import QAction, QIcon
-from PyQt6.QtCore import Qt
 
 
-# noinspection PyUnresolvedReferences
+class DatabaseConnection:
+    """Auxiliary class to prevent problems if database name changes"""
+    def __init__(self, database_file="database.db"):
+        self.database_file = database_file
+
+    def connect(self):
+        connection = sqlite3.connect(self.database_file)
+        return connection
+
+
 class MainWindow(QMainWindow):
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Student Management System")
@@ -26,6 +35,7 @@ class MainWindow(QMainWindow):
 
         # Add help sub-menu item
         about_action = QAction("About", self)
+        about_action.triggered.connect(self.about)
         help_menu_item.addAction(about_action)
 
         # Add edit sub-menu item
@@ -54,10 +64,9 @@ class MainWindow(QMainWindow):
         # Detect cell click
         self.table.cellClicked.connect(self.cell_clicked)
 
-
     def load_data(self):
         """Populate table with data from database"""
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         result = list(connection.execute("SELECT * FROM students"))
         self.table.setRowCount(0)
         for row_nr, row_data in enumerate(result):
@@ -81,21 +90,30 @@ class MainWindow(QMainWindow):
         self.statusbar.addWidget(edit_button)
         self.statusbar.addWidget(delete_button)
 
-    def insert(self):
+    @staticmethod
+    def insert():
         """Create a dialog window for typing students data"""
         dialog = InsertDialog()
         dialog.exec()
 
-    def search(self):
+    @staticmethod
+    def search():
         dialog = SearchDialog()
         dialog.exec()
 
-    def edit(self):
+    @staticmethod
+    def edit():
         dialog = EditDialog()
         dialog.exec()
 
-    def delete(self):
+    @staticmethod
+    def delete():
         dialog = DeleteDialog()
+        dialog.exec()
+
+    @staticmethod
+    def about():
+        dialog = AboutDialog()
         dialog.exec()
 
 
@@ -137,7 +155,7 @@ class InsertDialog(QDialog):
         name = self.student_name.text()
         course = self.course_name.itemText(self.course_name.currentIndex())
         phone = self.phone.text()
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         cursor = connection.cursor()
         cursor.execute("INSERT INTO students (name, course, mobile) VALUES (?, ?, ?)",
                        (name, course, phone))
@@ -146,8 +164,9 @@ class InsertDialog(QDialog):
         connection.close()
         student_management.load_data()
 
+        self.close()
 
-# noinspection PyUnresolvedReferences
+
 class SearchDialog(QDialog):
     def __init__(self):
         super().__init__()
@@ -169,7 +188,7 @@ class SearchDialog(QDialog):
 
     def search(self):
         name = self.student_name.text()
-        # connection = sqlite3.connect("database.db")
+        # connection = DatabaseConnection().connect()
         # cursor = connection.cursor()
         # result = cursor.execute("SELECT * FROM students WHERE name = ?", (name,))
         # rows = list(result)
@@ -179,8 +198,9 @@ class SearchDialog(QDialog):
         # cursor.close()
         # connection.close()
 
+        self.close()
 
-# noinspection PyUnresolvedReferences
+
 class EditDialog(QDialog):
     def __init__(self):
         super().__init__()
@@ -223,7 +243,7 @@ class EditDialog(QDialog):
         self.setLayout(layout)
 
     def update_student(self):
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         cursor = connection.cursor()
         cursor.execute("UPDATE students SET name = ?, course = ?, mobile = ? WHERE id = ?",
                        (self.student_name.text(),
@@ -237,8 +257,9 @@ class EditDialog(QDialog):
         # Refresh table
         student_management.load_data()
 
+        self.close()
 
-# noinspection PyUnresolvedReferences
+
 class DeleteDialog(QDialog):
     def __init__(self):
         super().__init__()
@@ -262,7 +283,7 @@ class DeleteDialog(QDialog):
         index = student_management.table.currentRow()
         student_id = student_management.table.item(index, 0).text()
 
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()
         cursor = connection.cursor()
         cursor.execute("DELETE from students WHERE id = ?", (student_id,))
         connection.commit()
@@ -277,6 +298,17 @@ class DeleteDialog(QDialog):
         confirmation_widget.setWindowTitle("Success")
         confirmation_widget.setText("The record has been deleted successfully!")
         confirmation_widget.exec()
+
+
+class AboutDialog(QMessageBox):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("About")
+        content = """
+        This App has been created to collect students data.
+        Feel free to modify and use the app as you wish.
+        """
+        self.setText(content)
 
 
 app = QApplication(sys.argv)
